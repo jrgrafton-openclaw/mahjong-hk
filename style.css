@@ -48,11 +48,11 @@ html, body {
 /* ---- SCREENS ---- */
 .screen {
   position: absolute; inset: 0;
-  display: none;
+  display: none !important;
   flex-direction: column;
   overflow: hidden;
 }
-.screen.active { display: flex; }
+.screen.active { display: flex !important; }
 
 /* ============================================================
    MAIN MENU
