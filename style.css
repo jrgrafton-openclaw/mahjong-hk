@@ -437,13 +437,17 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  min-height: 22px;
+  min-height: 46px;
+  overflow: hidden;
+  max-height: 94px; /* 2 rows of tile-md: 44px + 2px gap + 44px = 90px, a bit of breathing room */
+  align-content: flex-start;
 }
 .discard-grid--vert {
   flex-direction: column;
   flex-wrap: nowrap;
   overflow: hidden;
   max-height: 100%;
+  align-content: unset;
 }
 
 /* Middle row: West | center hub | East(South) */
@@ -456,7 +460,7 @@ html, body {
 }
 .discard-zone--west,
 .discard-zone--east {
-  width: 52px;
+  width: 56px;
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -510,6 +514,32 @@ html, body {
 .discard-grid .tile:last-child {
   border-color: rgba(200,151,58,0.6);
   box-shadow: 0 0 6px rgba(200,151,58,0.35);
+}
+
+/* Suit background tinting for discard tiles */
+.discard-grid .tile-man  { background: linear-gradient(135deg, rgba(232,93,93,0.07) 0%, var(--tile-face) 60%); }
+.discard-grid .tile-pin  { background: linear-gradient(135deg, rgba(93,168,232,0.07) 0%, var(--tile-face) 60%); }
+.discard-grid .tile-sou  { background: linear-gradient(135deg, rgba(93,232,138,0.07) 0%, var(--tile-face) 60%); }
+.discard-grid .tile-wind,
+.discard-grid .tile-dragon { background: linear-gradient(135deg, rgba(232,200,93,0.07) 0%, var(--tile-face) 60%); }
+
+/* Claiming phase glow on center hub */
+@keyframes claimingPulse {
+  0%, 100% { border-color: rgba(200,151,58,0.3); box-shadow: 0 0 8px rgba(200,151,58,0.15); }
+  50% { border-color: var(--gold); box-shadow: 0 0 24px rgba(200,151,58,0.5), 0 0 48px rgba(200,151,58,0.15); }
+}
+.discard-center.claiming {
+  animation: claimingPulse 1s ease-in-out infinite;
+}
+
+/* Pulsing glow on live last-discard tile */
+@keyframes liveDiscardPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(200,151,58,0.8), 0 0 32px rgba(200,151,58,0.35), 0 3px 10px rgba(0,0,0,0.7); }
+  50% { box-shadow: 0 0 28px rgba(200,151,58,1.0), 0 0 56px rgba(200,151,58,0.55), 0 3px 10px rgba(0,0,0,0.7); }
+}
+.last-discard .tile.last-discard-live {
+  animation: liveDiscardPulse 1s ease-in-out infinite;
+  border-color: var(--gold-glow) !important;
 }
 
 /* Hint Banner */
@@ -643,6 +673,10 @@ html, body {
 .tile-lg {
   width: 46px; height: 62px;
   font-size: 26px;
+}
+.tile-md {
+  width: 32px; height: 44px;
+  font-size: 16px;
 }
 .tile-sm {
   width: 28px; height: 38px;

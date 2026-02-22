@@ -814,7 +814,7 @@ const App = window.App = {
       if (disc) {
         disc.innerHTML = '';
         for (const t of p.discards) {
-          disc.appendChild(renderMiniTile(t, 'xs'));
+          disc.appendChild(renderMiniTile(t, 'md'));
         }
       }
 
@@ -830,7 +830,7 @@ const App = window.App = {
       const p0 = STATE.players[0];
       if (p0) {
         for (const t of p0.discards) {
-          playerDisc.appendChild(renderMiniTile(t, 'xs'));
+          playerDisc.appendChild(renderMiniTile(t, 'md'));
         }
       }
     }
@@ -839,8 +839,13 @@ const App = window.App = {
   renderLastDiscard() {
     const el = document.getElementById('last-discard');
     el.innerHTML = '';
+    const centerHub = el.closest('.discard-center');
+    const isClaiming = STATE.phase === 'claim' && !!STATE.lastDiscard;
+    if (centerHub) centerHub.classList.toggle('claiming', isClaiming);
     if (STATE.lastDiscard) {
-      el.appendChild(renderTileEl(STATE.lastDiscard, 'lg'));
+      const tileEl = renderTileEl(STATE.lastDiscard, 'lg');
+      if (isClaiming) tileEl.classList.add('last-discard-live');
+      el.appendChild(tileEl);
     }
   },
 
