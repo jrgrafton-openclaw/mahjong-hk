@@ -1015,33 +1015,69 @@ const App = window.App = {
   showWinScreen(winnerIdx, result, fan, scored, isTsumo) {
     const isHuman = winnerIdx === 0;
     const winnerName = SEAT_NAMES[winnerIdx];
+    const player = STATE.players[winnerIdx];
 
-    document.getElementById('win-title').textContent = isHuman ? '胡牌!' : `${winnerName} Wins!`;
+    document.getElementById('win-title').textContent = isHuman ? '胡牌!' : `${winnerName} 胡!`;
     document.getElementById('win-subtitle').textContent = isHuman
-      ? (isTsumo ? 'Tsumo — Self Draw Win!' : 'Ron — Win on Discard!')
-      : `${WIND_NAMES[STATE.players[winnerIdx].seatWind-1]} player wins this round`;
+      ? (isTsumo ? '🀄 自摸 Tsumo — Self Draw Win!' : '🀄 榮和 Ron — Win on Discard!')
+      : `${WIND_NAMES[player.seatWind-1]} player wins this round`;
 
     // Show winning hand tiles
     const winHand = document.getElementById('win-hand');
     winHand.innerHTML = '';
-    const player = STATE.players[winnerIdx];
-    // Melds
+
+    // Show declared melds first
     for (const meld of player.melds) {
       const setEl = document.createElement('div');
       setEl.className = 'meld-set';
+      const label = document.createElement('div');
+      label.className = 'meld-label';
+      label.textContent = meld.type.toUpperCase();
+      setEl.appendChild(label);
       for (const t of meld.tiles) setEl.appendChild(renderTileEl(t, 'sm'));
       winHand.appendChild(setEl);
     }
-    // Remaining hand
-    const handToShow = isHuman || result.allMelds ? player.hand : player.hand;
-    sortHand(player.hand).forEach(t => winHand.appendChild(renderTileEl(t, 'sm')));
+
+    // Show hand tiles (from winning detection)
+    if (result.pair) {
+      // Show pair highlighted
+      const pairEl = document.createElement('div');
+      pairEl.className = 'meld-set';
+      const pLabel = document.createElement('div');
+      pLabel.className = 'meld-label';
+      pLabel.textContent = 'PAIR';
+      pairEl.appendChild(pLabel);
+      result.pair.forEach(t => pairEl.appendChild(renderTileEl(t, 'sm')));
+      winHand.appendChild(pairEl);
+      // Show remaining melds
+      for (const meld of result.melds) {
+        const setEl = document.createElement('div');
+        setEl.className = 'meld-set';
+        const label = document.createElement('div');
+        label.className = 'meld-label';
+        label.textContent = meld.type.toUpperCase();
+        setEl.appendChild(label);
+        meld.tiles.forEach(t => setEl.appendChild(renderTileEl(t, 'sm')));
+        winHand.appendChild(setEl);
+      }
+    } else {
+      // Just show all hand tiles sorted
+      sortHand(player.hand).forEach(t => winHand.appendChild(renderTileEl(t, 'sm')));
+    }
 
     document.getElementById('win-score').textContent = `${fan} Fan · +${scored} pts`;
-    document.getElementById('win-breakdown').innerHTML = result.fan.breakdown.join('<br>');
+
+    // Score board
+    const breakdown = document.getElementById('win-breakdown');
+    breakdown.innerHTML = result.fan.breakdown.join(' · ') + '<br><br>' +
+      '<b style="color:var(--gold)">Scores:</b><br>' +
+      STATE.players.map((p, i) => {
+        const marker = i === winnerIdx ? '🏆 ' : '';
+        return `${marker}${SEAT_NAMES[i]}: ${STATE.scores[i]} pts`;
+      }).join(' &nbsp;|&nbsp; ');
 
     // Particles!
     this.spawnParticles();
-
     this.showScreen('screen-win');
   },
 
@@ -1202,11 +1238,12 @@ const App = window.App = {
     const tile = STATE.lastDiscard;
     if (!tile) return false;
     const player = STATE.players[0];
-    const matching = player.hand.filter(t => tileEqual(t, tile));
-    const chows = findChowsWithTile(player.hand.filter(t=>!isBonus(t)), tile);
-    const hand14 = [...player.hand, tile];
-    const canWin = checkWin(hand14, player.melds);
-    return matching.length >= 2 || chows.length > 0 || canWin;
+    const handTiles = player.hand.filter(t => !isBonus(t));
+    const matching = handTiles.filter(t => tileEqual(t, tile));
+    const chows = findChowsWithTile(handTiles, tile);
+    const handWithDiscard = [...player.hand, tile];
+    const canWin = checkWin(handWithDiscard, player.melds);
+    return matching.length >= 2 || chows.length > 0 || !!canWin;
   },
 
   processAIClaim(discardedBy) {
@@ -1375,15 +1412,20 @@ const App = window.App = {
   },
 
   endGame(reason) {
+    clearTimeout(STATE.aiThinkTimeout);
+    STATE.animating = false;
     if (reason === 'draw') {
       this.showDeclarationToast('流局 — Draw!');
       setTimeout(() => {
         this.showScreen('screen-win');
         document.getElementById('win-title').textContent = '流局';
-        document.getElementById('win-subtitle').textContent = 'Wall exhausted — Draw game';
+        document.getElementById('win-subtitle').textContent = 'Wall exhausted — No winner this round';
         document.getElementById('win-hand').innerHTML = '';
-        document.getElementById('win-score').textContent = 'No winner this round';
-        document.getElementById('win-breakdown').textContent = '';
+        document.getElementById('win-score').textContent = 'Draw Game';
+        document.getElementById('win-breakdown').innerHTML =
+          'The wall is empty. No points awarded.<br><br>' +
+          '<b style="color:var(--gold)">Scores:</b><br>' +
+          STATE.players.map((p, i) => `${SEAT_NAMES[i]}: ${STATE.scores[i]} pts`).join(' &nbsp;|&nbsp; ');
         this.spawnParticles();
       }, 1500);
     }
