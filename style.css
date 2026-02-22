@@ -339,7 +339,7 @@ html, body {
 /* Game header */
 .game-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px 6px;
+  padding: 10px 20px 6px;
   background: rgba(0,0,0,0.25);
   border-bottom: 1px solid rgba(200,151,58,0.15);
   flex-shrink: 0;
@@ -372,7 +372,7 @@ html, body {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 4px;
-  padding: 4px 6px;
+  padding: 4px 10px;
   flex-shrink: 0;
 }
 .ai-strip {
@@ -445,10 +445,13 @@ html, body {
 .discard-grid--vert {
   flex-direction: column;
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   max-height: 100%;
   align-content: unset;
+  scrollbar-width: none;
 }
+.discard-grid--vert::-webkit-scrollbar { display: none; }
 
 /* Middle row: West | center hub | East(South) */
 .discard-middle-row {
@@ -460,7 +463,7 @@ html, body {
 }
 .discard-zone--west,
 .discard-zone--east {
-  width: 56px;
+  width: 70px;
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -698,7 +701,28 @@ html, body {
 .tile-man .tile-rank { color: var(--man-color); }
 .tile-pin .tile-rank { color: var(--pin-color); }
 .tile-sou .tile-rank { color: var(--sou-color); }
-.tile-honor .tile-rank { color: var(--honor-color); font-size: 0.75em; }
+
+/* Wind tiles — gold/yellow, slightly smaller char to fit */
+.tile-wind .tile-rank { color: #e8c85d; font-size: 0.82em; }
+.tile-wind .tile-suit { color: #a08840; font-size: 0.48em; letter-spacing: 0.05em; }
+.tile-wind { border-color: #a08840; box-shadow: 0 0 6px rgba(232,200,93,0.3), inset 0 1px 0 rgba(255,255,255,0.08), 0 3px 8px rgba(0,0,0,0.6); }
+
+/* Dragon tiles — each has its own distinct color */
+/* 中 Chun / Red Dragon */
+.tile-dragon-1 .tile-rank { color: #ff4444; font-size: 0.82em; font-weight: 900; }
+.tile-dragon-1 .tile-suit { color: #aa2222; font-size: 0.48em; }
+.tile-dragon-1 { border-color: rgba(255,68,68,0.7); box-shadow: 0 0 8px rgba(255,68,68,0.4), inset 0 1px 0 rgba(255,255,255,0.08), 0 3px 8px rgba(0,0,0,0.6); }
+
+/* 發 Hatsu / Green Dragon */
+.tile-dragon-2 .tile-rank { color: #39e85d; font-size: 0.82em; font-weight: 900; }
+.tile-dragon-2 .tile-suit { color: #1a9933; font-size: 0.48em; }
+.tile-dragon-2 { border-color: rgba(57,232,93,0.7); box-shadow: 0 0 8px rgba(57,232,93,0.35), inset 0 1px 0 rgba(255,255,255,0.08), 0 3px 8px rgba(0,0,0,0.6); }
+
+/* 白 Haku / White Dragon */
+.tile-dragon-3 .tile-rank { color: #e8e8e8; font-size: 0.82em; font-weight: 900; }
+.tile-dragon-3 .tile-suit { color: #999; font-size: 0.48em; }
+.tile-dragon-3 { border-color: rgba(220,220,220,0.6); box-shadow: 0 0 6px rgba(220,220,220,0.25), inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 8px rgba(0,0,0,0.6); background: #28283a; }
+
 .tile-bonus .tile-rank { color: var(--bonus-color); }
 
 /* Selected */

@@ -77,12 +77,14 @@ function tileChar(tile) {
 }
 
 function suitLabel(suit) {
-  const map = { man:'萬', pin:'筒', sou:'索', wind:'風', dragon:'龍', flower:'花', season:'季' };
+  const map = { man:'萬', pin:'筒', sou:'索', wind:'風', dragon:'牌', flower:'花', season:'季' };
   return map[suit] || '';
 }
 
 function tileSuitClass(tile) {
   if (tile.suit === 'flower' || tile.suit === 'season') return 'tile-bonus';
+  if (tile.suit === 'dragon') return `tile-dragon tile-dragon-${tile.rank}`; // 1=Chun(red), 2=Hatsu(green), 3=Haku(white)
+  if (tile.suit === 'wind') return 'tile-wind';
   return `tile-${tile.suit}`;
 }
 
@@ -1550,8 +1552,8 @@ const HELP_CONTENT = {
       </div>
       <h3>Honor Tiles</h3>
       <div class="tile-legend">
-        <div class="tile-legend-item"><span class="tile-mini" style="color:#e8c85d">東南西北</span><span>Wind tiles (East, South, West, North)</span></div>
-        <div class="tile-legend-item"><span class="tile-mini" style="color:#e8c85d">中發白</span><span>Dragon tiles (Red, Green, White)</span></div>
+        <div class="tile-legend-item"><span class="tile-mini" style="color:#e8c85d">東南西北</span><span>Wind tiles — gold border</span></div>
+        <div class="tile-legend-item"><span class="tile-mini"><span style="color:#ff4444">中</span> <span style="color:#39e85d">發</span> <span style="color:#e8e8e8">白</span></span><span>Dragons — Red 中, Green 發, White 白</span></div>
       </div>
       <p>Honor tiles cannot form sequences (chow). They can only form triplets (pong) or quads (kong).</p>
       <h3>Bonus Tiles</h3>
