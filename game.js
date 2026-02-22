@@ -713,17 +713,53 @@ const App = window.App = {
     const player = STATE.players[0];
     const tiles = player.hand.filter(t => !isBonus(t));
     if (tiles.length < 1) return;
-    const shanten = calcShanten(tiles);
     const badge = document.getElementById('player-wind-badge');
     if (!badge) return;
+
+    // Only show meaningful shanten for 13-tile hands (standard draw phase)
+    // For 14-tile hands, checkWin is more accurate
     let shantenText = '';
-    if (shanten === -1) shantenText = ' · 胡!';
-    else if (shanten === 0) shantenText = ' · 聽牌 Tenpai!';
-    else if (shanten <= 2) shantenText = ` · ${shanten} away`;
+    let color = 'var(--gold)';
+    let borderColor = '';
+    let boxShadow = '';
+
+    if (tiles.length === 14) {
+      // Check actual win
+      if (checkWin(tiles, player.melds)) {
+        shantenText = ' · 胡! WIN!';
+        color = 'var(--neon-win)';
+        borderColor = 'rgba(57,255,20,0.5)';
+        boxShadow = '0 0 12px rgba(57,255,20,0.3)';
+      } else {
+        shantenText = ' · Discard a tile';
+        color = 'var(--amber)';
+      }
+    } else if (tiles.length === 13) {
+      const shanten = calcShanten(tiles);
+      if (shanten <= 0) {
+        shantenText = ' · 聽牌 Tenpai!';
+        color = 'var(--neon-win)';
+        borderColor = 'rgba(57,255,20,0.5)';
+        boxShadow = '0 0 12px rgba(57,255,20,0.3)';
+      } else if (shanten <= 2) {
+        shantenText = ` · ${shanten} tile${shanten>1?'s':''} away`;
+        color = 'var(--amber)';
+      }
+    } else {
+      // With melds, hand is smaller
+      const shanten = calcShanten(tiles);
+      if (shanten <= 0) {
+        shantenText = ' · 聽牌!';
+        color = 'var(--neon-win)';
+        borderColor = 'rgba(57,255,20,0.5)';
+        boxShadow = '0 0 12px rgba(57,255,20,0.3)';
+      }
+    }
+
     badge.textContent = WIND_NAMES[player.seatWind - 1] + ' Seat' + shantenText;
-    badge.style.color = shanten === 0 ? 'var(--neon-win)' : shanten <= 2 ? 'var(--amber)' : 'var(--gold)';
-    badge.style.borderColor = shanten === 0 ? 'rgba(57,255,20,0.5)' : '';
-    badge.style.boxShadow = shanten === 0 ? '0 0 12px rgba(57,255,20,0.3)' : '';
+    badge.style.color = color;
+    badge.style.borderColor = borderColor;
+    badge.style.boxShadow = boxShadow;
   },
 
   renderPlayerHand() {
