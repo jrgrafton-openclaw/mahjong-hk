@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -34,8 +34,8 @@
         <span class="btn-icon">▶</span> New Game
       </button>
       <div class="difficulty-row">
-        <button class="btn-diff active" id="diff-easy" onclick="App.setDifficulty('easy')">Easy</button>
-        <button class="btn-diff active" id="diff-medium" onclick="App.setDifficulty('medium')">Medium</button>
+        <button class="btn-diff" id="diff-easy" onclick="App.setDifficulty('easy')">Easy</button>
+        <button class="btn-diff selected" id="diff-medium" onclick="App.setDifficulty('medium')">Medium</button>
         <button class="btn-diff" id="diff-hard" onclick="App.setDifficulty('hard')">Hard</button>
       </div>
       <button class="btn-secondary" onclick="App.showHelp()">
@@ -63,7 +63,7 @@
       <button class="help-tab" onclick="App.showHelpTab('scoring')">Scoring</button>
       <button class="help-tab" onclick="App.showHelpTab('strategy')">Strategy</button>
     </div>
-    <div id="help-content" class="help-content">
+    <div id="help-content" class="help-content" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">
       <!-- Filled by JS -->
     </div>
   </div>
@@ -184,6 +184,6 @@
   </div>
 </div>
 
-<script type="module" src="game.js?v=3"></script>
+<script type="module" src="game.js?v=4"></script>
 </body>
 </html>

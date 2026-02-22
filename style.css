@@ -215,6 +215,14 @@ html, body {
 #screen-help {
   background: #0e1e0e;
 }
+
+.help-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
 .help-header {
   display: flex; align-items: center; gap: 12px;
   padding: 16px 20px;
