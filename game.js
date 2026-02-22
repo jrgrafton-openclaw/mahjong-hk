@@ -799,25 +799,40 @@ const App = window.App = {
 
   renderAI() {
     const aiSlots = [
-      { playerIdx: 1, discardEl: 'ai-west-discards', countEl: 'ai-west-count', scoreEl: 'ai-west-score', areaId: 'ai-west' },
-      { playerIdx: 2, discardEl: 'ai-north-discards', countEl: 'ai-north-count', scoreEl: 'ai-north-score', areaId: 'ai-north' },
-      { playerIdx: 3, discardEl: 'ai-south-discards', countEl: 'ai-south-count', scoreEl: 'ai-south-score', areaId: 'ai-south' },
+      { playerIdx: 1, countEl: 'ai-west-count', scoreEl: 'ai-west-score', areaId: 'ai-west', discardZone: 'discards-west' },
+      { playerIdx: 2, countEl: 'ai-north-count', scoreEl: 'ai-north-score', areaId: 'ai-north', discardZone: 'discards-north' },
+      { playerIdx: 3, countEl: 'ai-south-count', scoreEl: 'ai-south-score', areaId: 'ai-south', discardZone: 'discards-south' },
     ];
     for (const slot of aiSlots) {
       const p = STATE.players[slot.playerIdx];
       if (!p) continue;
       document.getElementById(slot.countEl).textContent = p.hand.length + (p.melds.length > 0 ? ` +${p.melds.length*3}` : '');
       document.getElementById(slot.scoreEl).textContent = STATE.scores[slot.playerIdx];
-      const disc = document.getElementById(slot.discardEl);
-      disc.innerHTML = '';
-      const maxShow = 12;
-      const start = Math.max(0, p.discards.length - maxShow);
-      for (let i = start; i < p.discards.length; i++) {
-        disc.appendChild(renderMiniTile(p.discards[i], 'xs'));
+
+      // Render into the discard table zone
+      const disc = document.getElementById(slot.discardZone);
+      if (disc) {
+        disc.innerHTML = '';
+        for (const t of p.discards) {
+          disc.appendChild(renderMiniTile(t, 'xs'));
+        }
       }
-      // Active turn highlight
+
+      // Active turn highlight on the strip
       const area = document.getElementById(slot.areaId);
-      area.classList.toggle('active-turn', STATE.currentTurn === slot.playerIdx);
+      if (area) area.classList.toggle('active-turn', STATE.currentTurn === slot.playerIdx);
+    }
+
+    // Render human player's discards in the table
+    const playerDisc = document.getElementById('discards-player');
+    if (playerDisc) {
+      playerDisc.innerHTML = '';
+      const p0 = STATE.players[0];
+      if (p0) {
+        for (const t of p0.discards) {
+          playerDisc.appendChild(renderMiniTile(t, 'xs'));
+        }
+      }
     }
   },
 

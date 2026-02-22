@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -83,52 +83,67 @@
     <button class="btn-help-float" onclick="App.showHelp(true)">?</button>
   </div>
 
-  <!-- AI Players Area -->
-  <div class="ai-area" id="ai-area">
-    <!-- AI Player 1 (Left / West) -->
-    <div class="ai-player" id="ai-west">
-      <div class="ai-header">
-        <span class="ai-wind">West</span>
-        <span class="ai-name">West AI</span>
-        <span class="ai-tile-count" id="ai-west-count">13</span>
-        <span class="ai-score" id="ai-west-score">0</span>
-      </div>
-      <div class="ai-discards" id="ai-west-discards"></div>
+  <!-- AI Player Info Strips (compact — no discards here anymore) -->
+  <div class="ai-strips">
+    <div class="ai-strip" id="ai-west">
+      <span class="ai-wind">West</span>
+      <span class="ai-tile-count" id="ai-west-count">13</span>
+      <span class="ai-score" id="ai-west-score">0</span>
     </div>
-    <!-- AI Player 2 (Top / North) -->
-    <div class="ai-player ai-player--top" id="ai-north">
-      <div class="ai-header">
-        <span class="ai-wind">North</span>
-        <span class="ai-name">North AI</span>
-        <span class="ai-tile-count" id="ai-north-count">13</span>
-        <span class="ai-score" id="ai-north-score">0</span>
-      </div>
-      <div class="ai-discards" id="ai-north-discards"></div>
+    <div class="ai-strip ai-strip--north" id="ai-north">
+      <span class="ai-wind">North</span>
+      <span class="ai-tile-count" id="ai-north-count">13</span>
+      <span class="ai-score" id="ai-north-score">0</span>
     </div>
-    <!-- AI Player 3 (Right / South) -->
-    <div class="ai-player" id="ai-south">
-      <div class="ai-header">
-        <span class="ai-wind">South</span>
-        <span class="ai-name">South AI</span>
-        <span class="ai-tile-count" id="ai-south-count">13</span>
-        <span class="ai-score" id="ai-south-score">0</span>
-      </div>
-      <div class="ai-discards" id="ai-south-discards"></div>
+    <div class="ai-strip" id="ai-south">
+      <span class="ai-wind">South (E)</span>
+      <span class="ai-tile-count" id="ai-south-count">13</span>
+      <span class="ai-score" id="ai-south-score">0</span>
     </div>
   </div>
 
-  <!-- Center Table: Last discard & wall info -->
-  <div class="table-center">
-    <div class="wall-info">
-      <span class="wall-label">Wall</span>
-      <span id="wall-count" class="wall-count">144</span>
+  <!-- DISCARD TABLE — 4-way, traditional layout -->
+  <div class="discard-table">
+
+    <!-- North discards (top) -->
+    <div class="discard-zone discard-zone--north">
+      <div class="discard-zone-label">North</div>
+      <div class="discard-grid" id="discards-north"></div>
     </div>
-    <div class="last-discard-area">
-      <div id="last-discard" class="last-discard"></div>
+
+    <!-- Middle row: West | Center | East -->
+    <div class="discard-middle-row">
+      <div class="discard-zone discard-zone--west">
+        <div class="discard-zone-label">West</div>
+        <div class="discard-grid discard-grid--vert" id="discards-west"></div>
+      </div>
+
+      <!-- Center hub: wall count, last discard, turn -->
+      <div class="discard-center">
+        <div class="wall-info">
+          <span class="wall-label">Wall</span>
+          <span id="wall-count" class="wall-count">144</span>
+        </div>
+        <div class="last-discard-area">
+          <div id="last-discard" class="last-discard"></div>
+        </div>
+        <div class="turn-indicator">
+          <span id="turn-text">Your Turn</span>
+        </div>
+      </div>
+
+      <div class="discard-zone discard-zone--east">
+        <div class="discard-zone-label">South</div>
+        <div class="discard-grid discard-grid--vert" id="discards-south"></div>
+      </div>
     </div>
-    <div class="turn-indicator">
-      <span id="turn-text">Your Turn</span>
+
+    <!-- Player (you) discards (bottom) -->
+    <div class="discard-zone discard-zone--player">
+      <div class="discard-zone-label">You</div>
+      <div class="discard-grid" id="discards-player"></div>
     </div>
+
   </div>
 
   <!-- Hint Banner -->
@@ -184,6 +199,6 @@
   </div>
 </div>
 
-<script type="module" src="game.js?v=4"></script>
+<script type="module" src="game.js?v=5"></script>
 </body>
 </html>
