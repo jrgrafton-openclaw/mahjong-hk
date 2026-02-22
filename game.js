@@ -156,7 +156,8 @@ function isChow(a, b, c) {
   return ranks[1] === ranks[0] + 1 && ranks[2] === ranks[1] + 1;
 }
 
-// Find all valid chow sets in a hand that include a given tile
+// Find all valid chow sets in a hand that include a given discard tile
+// Returns arrays of 3 tiles (including the discard tile) forming valid sequences
 function findChowsWithTile(hand, tile) {
   if (!isSuit(tile)) return [];
   const r = tile.rank;
@@ -168,54 +169,68 @@ function findChowsWithTile(hand, tile) {
   ].filter(p => p[0] >= 1 && p[2] <= 9);
 
   for (const [a, b, c] of patterns) {
-    // We need tiles for ranks a, b, c (excluding the tile itself once)
-    const needed = [a, b, c].filter(rr => rr !== r);
-    const available = hand.filter(t => t.suit === s && needed.includes(t.rank));
-    // Group available by rank to check we have enough
+    // We need the other 2 ranks from hand (not the discard tile)
+    const neededRanks = [a, b, c].filter(rr => rr !== r);
+    // Group hand tiles by rank
     const byRank = {};
-    for (const t of available) byRank[t.rank] = (byRank[t.rank] || []).concat(t);
+    for (const t of hand) {
+      if (t.suit !== s) continue;
+      if (!byRank[t.rank]) byRank[t.rank] = [];
+      byRank[t.rank].push(t);
+    }
+    // Check we have all needed ranks in hand
     let valid = true;
-    const used = [tile];
-    for (const nr of needed) {
+    const used = [tile]; // the discard tile
+    for (const nr of neededRanks) {
       if (!byRank[nr] || byRank[nr].length === 0) { valid = false; break; }
-      used.push(byRank[nr].shift());
+      used.push(byRank[nr].shift()); // take one from hand
     }
     if (valid) results.push(used.sort((x,y) => x.rank - y.rank));
   }
   return results;
 }
 
-// Check if a hand (14 tiles) is a winning hand
-// Returns false or { melds, pair, fan }
-function checkWin(hand14, melds=[]) {
-  // Filter out bonus tiles
-  const playing = hand14.filter(t => !isBonus(t));
+// Check if a hand is a winning hand.
+// hand14: the tiles in hand (not including meld tiles which are separate)
+// melds: already-declared melds (pong/kong/chow sets from previous claims)
+// The hand is: 14 tiles in hand (after melds removed) or (14 - 3*melds.length) tiles + melds
+// In practice: call with the player's current hand array (which already excludes meld tiles)
+// plus one extra tile (the drawn or claimed tile) making it (13 - 3*melds.length + 1) + 3*melds
+// i.e. hand.length should be (2 + 3 * (4 - melds.length)) = 14 - 3*melds.length
+function checkWin(handTiles, melds=[]) {
+  const playing = handTiles.filter(t => !isBonus(t));
+  // With existing melds, hand should have 14 - 3*melds.length tiles
+  const expectedSize = 14 - melds.length * 3;
+  if (playing.length !== expectedSize) return false;
+  if (playing.length % 3 !== 2) return false;
   return findWinningHand(playing, melds);
 }
 
 function findWinningHand(tiles, existingMelds=[]) {
   if (tiles.length % 3 !== 2) return false;
+
+  // Special: 7 pairs (only when no existing melds)
+  if (tiles.length === 14 && existingMelds.length === 0) {
+    const pairs = findSevenPairs(tiles);
+    if (pairs) return { melds: pairs, pair: null, fan: calcFanSevenPairs(tiles, pairs), special: '7pairs', allMelds: pairs };
+  }
+
   // Try each unique tile as the pair
   const tried = new Set();
   for (const tile of tiles) {
     const k = tileKey(tile);
     if (tried.has(k)) continue;
     tried.add(k);
-    const pairTiles = tiles.filter(t => tileEqual(t, tile)).slice(0, 2);
-    if (pairTiles.length < 2) continue;
-    const rest = removeFirst(removeFirst(tiles, tile), tile);
-    if (!rest) continue;
+    const matching = tiles.filter(t => tileEqual(t, tile));
+    if (matching.length < 2) continue;
+    const rest = removeTiles(tiles, [matching[0], matching[1]]);
+    if (rest === null) continue;
     const meldSets = tryMeldAll(rest);
     if (meldSets !== false) {
       const allMelds = [...existingMelds, ...meldSets];
-      const fan = calcFan(allMelds, pairTiles[0], tiles);
-      return { melds: meldSets, pair: pairTiles, fan, allMelds };
+      const fan = calcFan(allMelds, matching[0], tiles);
+      return { melds: meldSets, pair: [matching[0], matching[1]], fan, allMelds };
     }
-  }
-  // Special: 7 pairs
-  if (tiles.length === 14 && existingMelds.length === 0) {
-    const pairs = findSevenPairs(tiles);
-    if (pairs) return { melds: pairs, pair: null, fan: calcFanSevenPairs(tiles, pairs), special: '7pairs', allMelds: pairs };
   }
   return false;
 }
@@ -228,45 +243,40 @@ function removeFirst(arr, target) {
   return result;
 }
 
-// Recursively try to form melds (sets of 3) from tiles
+// Recursively try to form melds (sets of 3) from tiles — exhaustive
 function tryMeldAll(tiles) {
   if (tiles.length === 0) return [];
   if (tiles.length % 3 !== 0) return false;
 
-  // Sort for determinism
+  // Sort for determinism — always process the "smallest" tile first
   const sorted = [...tiles].sort(tileSortCmp);
   const first = sorted[0];
 
   // Try pong with first tile
-  const sameTwo = sorted.filter(t => tileEqual(t, first));
-  if (sameTwo.length >= 2) {
-    const rest = removeFirst(removeFirst(sorted, first), first);
+  const sameOnes = sorted.filter(t => tileEqual(t, first) && t.id !== first.id);
+  if (sameOnes.length >= 2) {
+    const rest = removeTiles(sorted, [first, sameOnes[0], sameOnes[1]]);
     if (rest !== null) {
       const result = tryMeldAll(rest);
-      if (result !== false) return [{ type: 'pong', tiles: [first, sameTwo[0], sameTwo[1]] }, ...result];
+      if (result !== false) return [{ type: 'pong', tiles: [first, sameOnes[0], sameOnes[1]] }, ...result];
     }
   }
 
   // Try chow with first tile (only suit tiles)
   if (isSuit(first)) {
-    for (let step1 = 1; step1 <= 2; step1++) {
-      if (first.rank + step1 > 9) continue;
-      const t1 = sorted.find(t => t !== first && t.suit === first.suit && t.rank === first.rank + step1);
-      if (!t1) continue;
-      const need2Rank = first.rank + (step1 === 1 ? 2 : 1);
-      if (need2Rank > 9) continue;
-      // For step1=1, need rank+2; for step1=2, need rank+1
-      const usedIds = new Set([first.id, t1.id]);
-      const t2 = sorted.find(t => !usedIds.has(t.id) && t.suit === first.suit && t.rank === need2Rank);
-      if (!t2) continue;
-      const meldTiles = [first, t1, t2].sort((a,b)=>a.rank-b.rank);
-      const rest = removeTiles(sorted, meldTiles);
+    // Try r, r+1, r+2
+    const t1 = sorted.find(t => t.id !== first.id && t.suit === first.suit && t.rank === first.rank + 1);
+    const t2 = t1 ? sorted.find(t => t.id !== first.id && t.id !== t1.id && t.suit === first.suit && t.rank === first.rank + 2) : null;
+    if (t1 && t2) {
+      const rest = removeTiles(sorted, [first, t1, t2]);
       if (rest !== null) {
         const result = tryMeldAll(rest);
-        if (result !== false) return [{ type: 'chow', tiles: meldTiles }, ...result];
+        if (result !== false) return [{ type: 'chow', tiles: [first, t1, t2] }, ...result];
       }
     }
   }
+
+  // If we can't form any meld with the first tile, hand is invalid
   return false;
 }
 
@@ -355,84 +365,115 @@ function calcFanSevenPairs(tiles, pairs) {
 }
 
 // ── Shanten calculation (for AI) ──────────────────────────
-// Returns the shanten number (-1 = complete, 0 = tenpai, etc.)
+// Returns the shanten number (-1 = complete, 0 = tenpai, 1 = 1 away, etc.)
 function calcShanten(tiles) {
   if (tiles.length === 0) return 8;
   const playing = tiles.filter(t => !isBonus(t));
-  return shantenNormal(playing);
+  return Math.min(shantenNormal(playing), shantenSevenPairs(playing));
 }
 
 function shantenNormal(tiles) {
-  const n = tiles.length;
   let best = 8;
-
-  // Try each unique tile as pair
   const tried = new Set();
+
+  // Try each unique tile as the pair
   for (const tile of tiles) {
     const k = tileKey(tile);
     if (tried.has(k)) continue;
     tried.add(k);
-    if (tiles.filter(t => tileEqual(t, tile)).length < 2) continue;
+    const sameCount = tiles.filter(t => tileEqual(t, tile)).length;
+    if (sameCount < 2) continue;
     const rest = removeFirst(removeFirst(tiles, tile), tile);
     if (!rest) continue;
-    const s = shantenMelds(rest, 0) - 1;
+    const s = shantenFromMelds(rest);
     if (s < best) best = s;
   }
 
-  // No pair trial
-  const s2 = shantenMelds(tiles, -1);
+  // Also try without a designated pair (upper bound)
+  const s2 = shantenFromMelds(tiles) + 1;
   if (s2 < best) best = s2;
 
   return best;
 }
 
-function shantenMelds(tiles, pairBonus) {
-  // Greedy: count complete melds and partial melds
-  const { complete, partial } = countMeldsPartial(tiles);
-  const needed = Math.ceil(tiles.length / 3);
-  // shanten = (needed - 1) - complete - partial + (pairBonus === -1 ? 1 : 0)
-  const s = needed - 1 - complete + (pairBonus === 0 ? 0 : 1);
-  return Math.max(-1, s - partial);
+function shantenFromMelds(tiles) {
+  // DFS approach: find best split into complete melds + partial
+  const n = tiles.length;
+  if (n === 0) return -1;
+  const numMeldsNeeded = Math.floor(n / 3);
+  const [complete, partial] = bestMeldCount(tiles);
+  // shanten for melds part = numMeldsNeeded - 1 - complete - partial
+  return Math.max(-1, numMeldsNeeded - 1 - complete - partial + (n % 3 === 0 ? 0 : 0));
 }
 
-function countMeldsPartial(tiles) {
-  let complete = 0, partial = 0;
+function bestMeldCount(tiles) {
+  // Try all ways to extract melds greedily, return [complete, partial]
+  const sorted = [...tiles].sort(tileSortCmp);
+  return bestMeldHelper(sorted, 0, 0);
+}
+
+function bestMeldHelper(tiles, complete, partial) {
+  if (tiles.length === 0) return [complete, partial];
+
+  let best = [complete, partial];
   const used = new Set();
 
-  const sorted = [...tiles].sort(tileSortCmp);
+  // Try complete melds first
+  for (let i = 0; i < tiles.length; i++) {
+    if (used.has(i)) continue;
+    const a = tiles[i];
 
-  // First pass: complete melds
-  // Pongs
-  const groups = groupTiles(sorted);
-  for (const [k, group] of Object.entries(groups)) {
-    if (group.length >= 3) {
-      const use = group.slice(0, 3);
-      use.forEach(t => used.add(t.id));
-      complete++;
-      delete groups[k];
+    // Pong
+    for (let j = i+1; j < tiles.length; j++) {
+      if (used.has(j)) continue;
+      if (!tileEqual(tiles[j], a)) continue;
+      for (let k = j+1; k < tiles.length; k++) {
+        if (used.has(k)) continue;
+        if (!tileEqual(tiles[k], a)) continue;
+        const rest = tiles.filter((_,idx) => idx!==i && idx!==j && idx!==k);
+        const res = bestMeldHelper(rest, complete+1, partial);
+        if (res[0]*2+res[1] > best[0]*2+best[1]) best = res;
+        break;
+      }
+      break;
     }
-  }
-  // Chows
-  const remaining = sorted.filter(t => !used.has(t.id));
-  const melds = tryMeldAll(remaining);
-  if (melds !== false) {
-    complete += melds.length;
-    return { complete, partial: 0 };
+
+    // Chow
+    if (isSuit(a)) {
+      const r = a.rank;
+      for (let off = 1; off <= 2; off++) {
+        const j2 = tiles.findIndex((t,idx) => idx > i && !used.has(idx) && t.suit===a.suit && t.rank===r+off);
+        if (j2 === -1) continue;
+        const need3 = off === 1 ? r+2 : r+1;
+        const k2 = tiles.findIndex((t,idx) => idx > i && idx !== j2 && !used.has(idx) && t.suit===a.suit && t.rank===need3);
+        if (k2 === -1) continue;
+        const rest = tiles.filter((_,idx) => idx!==i && idx!==j2 && idx!==k2);
+        const res = bestMeldHelper(rest, complete+1, partial);
+        if (res[0]*2+res[1] > best[0]*2+best[1]) best = res;
+      }
+    }
+    break; // Only try from first tile for performance
   }
 
-  // Second pass: partial (pairs + partial sequences)
-  const rem = sorted.filter(t => !used.has(t.id));
-  for (let i = 0; i < rem.length - 1; i++) {
-    const a = rem[i]; if (used.has(a.id)) continue;
-    const b = rem[i+1];
-    if (tileEqual(a, b)) {
-      partial++; used.add(a.id); used.add(b.id); continue;
-    }
-    if (a.suit === b.suit && isSuit(a) && Math.abs(a.rank - b.rank) <= 2) {
-      partial++; used.add(a.id); used.add(b.id); continue;
+  // Try partial melds (pairs + partial sequences)
+  for (let i = 0; i < tiles.length - 1; i++) {
+    const a = tiles[i];
+    const b = tiles[i+1];
+    if (tileEqual(a, b) || (a.suit===b.suit && isSuit(a) && b.rank-a.rank <= 2)) {
+      const rest = tiles.filter((_,idx) => idx!==i && idx!==i+1);
+      const res = bestMeldHelper(rest, complete, partial+1);
+      if (res[0]*2+res[1] > best[0]*2+best[1]) best = res;
     }
   }
-  return { complete, partial };
+
+  return best;
+}
+
+function shantenSevenPairs(tiles) {
+  if (tiles.length !== 13 && tiles.length !== 14) return 8;
+  const groups = groupTiles(tiles);
+  const pairs = Object.values(groups).filter(g => g.length >= 2).length;
+  return 6 - pairs;
 }
 
 // ── AI Strategy ────────────────────────────────────────────
@@ -563,6 +604,11 @@ const App = window.App = {
     document.querySelectorAll('.btn-diff').forEach(b => b.classList.remove('selected'));
     const el = document.getElementById(`diff-${diff}`);
     if (el) el.classList.add('selected');
+    // Also update the start button
+    const startBtn = document.querySelector('#screen-menu .btn-primary');
+    if (startBtn) {
+      startBtn.onclick = () => App.startGame(diff);
+    }
   },
 
   showScreen(id) {
@@ -660,6 +706,24 @@ const App = window.App = {
     const p = STATE.players[0];
     document.getElementById('player-wind-badge').textContent = WIND_NAMES[p.seatWind - 1] + ' Seat';
     this.renderPlayerMelds();
+    this.updateShantenDisplay();
+  },
+
+  updateShantenDisplay() {
+    const player = STATE.players[0];
+    const tiles = player.hand.filter(t => !isBonus(t));
+    if (tiles.length < 1) return;
+    const shanten = calcShanten(tiles);
+    const badge = document.getElementById('player-wind-badge');
+    if (!badge) return;
+    let shantenText = '';
+    if (shanten === -1) shantenText = ' · 胡!';
+    else if (shanten === 0) shantenText = ' · 聽牌 Tenpai!';
+    else if (shanten <= 2) shantenText = ` · ${shanten} away`;
+    badge.textContent = WIND_NAMES[player.seatWind - 1] + ' Seat' + shantenText;
+    badge.style.color = shanten === 0 ? 'var(--neon-win)' : shanten <= 2 ? 'var(--amber)' : 'var(--gold)';
+    badge.style.borderColor = shanten === 0 ? 'rgba(57,255,20,0.5)' : '';
+    badge.style.boxShadow = shanten === 0 ? '0 0 12px rgba(57,255,20,0.3)' : '';
   },
 
   renderPlayerHand() {
@@ -813,8 +877,7 @@ const App = window.App = {
     if (STATE.animating) return;
     const tile = STATE.lastDiscard;
     const discardBy = STATE.lastDiscardBy;
-    // Chow only from the player to the left (in HK rules: any player after the discarder, but simplified to left player only for standard play)
-    if (!tile || discardBy === 3) return; // Can't chow from player on right... actually in HK rules left only
+    if (!tile || discardBy === 0) return; // Can't chow your own discard
     const player = STATE.players[0];
     const chows = findChowsWithTile(player.hand.filter(t=>!isBonus(t)), tile);
     if (chows.length === 0) return;
@@ -831,16 +894,26 @@ const App = window.App = {
     const modal = document.getElementById('modal-chow');
     const opts = document.getElementById('chow-options');
     opts.innerHTML = '';
+    // De-duplicate chow sequences by the ranks used
+    const seen = new Set();
     for (const chow of chows) {
+      const key = chow.map(t=>t.rank).sort().join('-');
+      if (seen.has(key)) continue;
+      seen.add(key);
       const btn = document.createElement('div');
       btn.className = 'chow-option';
       const tilesDiv = document.createElement('div');
       tilesDiv.className = 'chow-option-tiles';
-      // Show the full sequence (tile + 2 from hand)
-      const fullSeq = [...chow];
-      if (!fullSeq.find(t => t.id === tile.id)) fullSeq.push(tile);
-      fullSeq.sort((a,b)=>a.rank-b.rank).forEach(t => tilesDiv.appendChild(renderMiniTile(t, 'sm')));
+      chow.sort((a,b)=>a.rank-b.rank).forEach(t => {
+        const tEl = renderMiniTile(t, 'sm');
+        if (t.id === tile.id) tEl.style.boxShadow = '0 0 8px var(--gold-glow)'; // highlight discard
+        tilesDiv.appendChild(tEl);
+      });
       btn.appendChild(tilesDiv);
+      const label = document.createElement('span');
+      label.style.cssText = 'font-size:12px;color:var(--text-dim);margin-left:8px';
+      label.textContent = chow.map(t=>t.rank).sort((a,b)=>a-b).join('-');
+      btn.appendChild(label);
       btn.addEventListener('click', () => {
         modal.classList.add('hidden');
         this.executeChow(chow, tile, discardBy);
@@ -880,31 +953,46 @@ const App = window.App = {
   playerWin() {
     if (STATE.animating) return;
     const player = STATE.players[0];
-    // Assemble full 14-tile hand for checking
-    let hand14;
+    let handToCheck;
+    let isTsumo;
+
     if (STATE.phase === 'discard') {
-      // Self-draw win (tsumo) — player has 14 tiles
-      hand14 = [...player.hand];
-    } else {
+      // Self-draw win (tsumo) — hand already has 14 - 3*melds tiles
+      handToCheck = [...player.hand];
+      isTsumo = true;
+    } else if (STATE.phase === 'claim' && STATE.lastDiscard) {
       // Win on discard
-      hand14 = [...player.hand, STATE.lastDiscard];
+      handToCheck = [...player.hand, STATE.lastDiscard];
+      isTsumo = false;
+    } else {
+      return;
     }
 
-    const result = checkWin(hand14, player.melds);
+    const result = checkWin(handToCheck, player.melds);
     if (!result) {
       this.showHint('❌ Not a winning hand yet! Keep building.');
       return;
     }
-    this.executeWin(0, result, STATE.phase === 'discard', STATE.lastDiscard);
+
+    if (!isTsumo && STATE.lastDiscard) {
+      player.hand.push(STATE.lastDiscard);
+      STATE.players[STATE.lastDiscardBy].discards.pop();
+    }
+    this.executeWin(0, result, isTsumo, isTsumo ? null : STATE.lastDiscard);
   },
 
   checkWinCondition(playerIdx) {
     const player = STATE.players[playerIdx];
-    const hand14 = [...player.hand];
-    const result = checkWin(hand14, player.melds);
+    // In discard phase player has full hand (already drew); in claim they need +lastDiscard
+    const handToCheck = STATE.phase === 'claim' && STATE.lastDiscardBy !== playerIdx && STATE.lastDiscard
+      ? [...player.hand, STATE.lastDiscard]
+      : [...player.hand];
+    const result = checkWin(handToCheck, player.melds);
     if (result) {
-      const el = document.getElementById('btn-win');
-      if (el) el.classList.remove('hidden');
+      if (playerIdx === 0) {
+        const el = document.getElementById('btn-win');
+        if (el) el.classList.remove('hidden');
+      }
       return true;
     }
     return false;
@@ -985,40 +1073,56 @@ const App = window.App = {
     const lastDiscard = STATE.lastDiscard;
     const discardBy = STATE.lastDiscardBy;
 
-    const show = id => document.getElementById(id).classList.remove('hidden');
-    const hide = id => document.getElementById(id).classList.add('hidden');
+    const show = id => { const el = document.getElementById(id); if(el) el.classList.remove('hidden'); };
+    const hide = id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); };
 
     hide('btn-draw'); hide('btn-pong'); hide('btn-kong');
-    hide('btn-chow'); hide('btn-win');
+    hide('btn-chow'); hide('btn-win'); hide('btn-pass');
 
     if (phase === 'draw' && turn === 0) {
       if (wallRemaining() > 0) show('btn-draw');
     }
 
     if (phase === 'claim' && lastDiscard && discardBy !== 0) {
-      // Check pong
-      const matching = player.hand.filter(t => tileEqual(t, lastDiscard));
+      const handTiles = player.hand.filter(t => !isBonus(t));
+      const matching = handTiles.filter(t => tileEqual(t, lastDiscard));
+
+      // Pong: need 2 matching
       if (matching.length >= 2) {
         show('btn-pong');
+        // Kong: need 3 matching
         if (matching.length >= 3) show('btn-kong');
       }
-      // Check chow (from player to right, i.e. discardBy === 3 means left of human... HK allows from any)
-      const chows = findChowsWithTile(player.hand.filter(t=>!isBonus(t)), lastDiscard);
+
+      // Chow: only from player immediately after discarder (left of discarder = nextTurn)
+      // In HK Mahjong, any player can chow in some variants; here we allow it for human always
+      const chows = findChowsWithTile(handTiles, lastDiscard);
       if (chows.length > 0) show('btn-chow');
-      // Check win on discard
-      const hand14 = [...player.hand, lastDiscard];
-      if (checkWin(hand14, player.melds)) show('btn-win');
+
+      // Win on discard
+      const handToCheck = [...player.hand, lastDiscard];
+      if (checkWin(handToCheck, player.melds)) show('btn-win');
+
+      // Pass button — always available in claim phase
+      show('btn-pass');
 
       // Show hints
-      this.showClaimHints(matching.length, chows.length, hand14);
+      this.showClaimHints(matching.length, chows.length, handToCheck);
     }
 
     if (phase === 'discard' && turn === 0) {
-      // Check self-draw win
+      // Check self-draw win (tsumo)
       if (checkWin(player.hand, player.melds)) {
         show('btn-win');
       }
     }
+  },
+
+  playerPass() {
+    if (STATE.phase !== 'claim') return;
+    this.dismissHint();
+    // Continue to AI claim check or next turn
+    this.processAIClaim(STATE.lastDiscardBy);
   },
 
   showClaimHints(pongCount, chowCount, hand14) {
@@ -1118,10 +1222,11 @@ const App = window.App = {
     for (const idx of order) {
       if (idx === discardedBy || idx === 0) continue;
       const p = STATE.players[idx];
-      const matching = p.hand.filter(t => tileEqual(t, tile));
-      const hand14 = [...p.hand, tile];
+      const handTiles = p.hand.filter(t => !isBonus(t));
+      const matching = handTiles.filter(t => tileEqual(t, tile));
+      const handWithDiscard = [...p.hand, tile];
       // Check win
-      if (checkWin(hand14, p.melds)) {
+      if (checkWin(handWithDiscard, p.melds)) {
         claimedBy = idx; claimType = 'win'; break;
       }
       // Check pong
@@ -1167,11 +1272,12 @@ const App = window.App = {
     STATE.lastDiscard = null;
 
     if (type === 'win') {
-      const hand14 = [...claimer.hand, tile];
-      const result = checkWin(hand14, claimer.melds);
+      const handWithTile = [...claimer.hand, tile];
+      const result = checkWin(handWithTile, claimer.melds);
+      if (!result) { this.advanceTurn(discardedBy); return; } // safety check
       claimer.hand.push(tile);
       STATE.scores[claimerIdx] += Math.pow(2, result.fan.fan) * 4;
-      this.showDeclarationToast(`${SEAT_NAMES[claimerIdx]} 胡! WINS!`);
+      this.showDeclarationToast(`${SEAT_NAMES[claimerIdx]}: 胡! WINS!`);
       setTimeout(() => this.executeWin(claimerIdx, result, false, tile), 1200);
       return;
     }
@@ -1237,13 +1343,15 @@ const App = window.App = {
       const tile = drawFromWall();
       if (!tile) { this.endGame('draw'); return; }
       const p = STATE.players[playerIdx];
+      tile._justDrawn = true;
       p.hand.push(tile);
       this.extractBonus(p);
 
-      // Check AI win
+      // Check AI win (tsumo)
       const result = checkWin(p.hand, p.melds);
-      if (result && (this.difficulty === 'hard' || (this.difficulty === 'medium' && Math.random() < 0.8) || Math.random() < 0.5)) {
-        this.showDeclarationToast(`${SEAT_NAMES[playerIdx]} 胡! WINS!`);
+      if (result) {
+        // AI always declares win when possible (it's winning, why wouldn't they?)
+        this.showDeclarationToast(`${SEAT_NAMES[playerIdx]}: 胡! WINS!`);
         STATE.scores[playerIdx] += Math.pow(2, result.fan.fan) * 4;
         setTimeout(() => this.executeWin(playerIdx, result, true, null), 1200);
         return;
@@ -1450,10 +1558,12 @@ const HELP_CONTENT = {
   `,
 };
 
-// ── Difficulty Button Init ───────────────────────────────────
+// ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   App.setDifficulty('medium');
   App.showHelpTab('basics');
+  // Show menu
+  App.showScreen('screen-menu');
 });
 
 // Handle page visibility (pause AI when hidden)
