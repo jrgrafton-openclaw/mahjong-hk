@@ -612,9 +612,15 @@ const App = window.App = {
   },
 
   showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.screen').forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';
+    });
     const el = document.getElementById(id);
-    if (el) el.classList.add('active');
+    if (el) {
+      el.classList.add('active');
+      el.style.display = 'flex';
+    }
   },
 
   goMenu() {
@@ -1638,9 +1644,13 @@ const HELP_CONTENT = {
 
 // ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Ensure all screens are hidden before showing menu
+  document.querySelectorAll('.screen').forEach(s => {
+    s.style.display = 'none';
+    s.classList.remove('active');
+  });
   App.setDifficulty('medium');
   App.showHelpTab('basics');
-  // Show menu
   App.showScreen('screen-menu');
 });
 
